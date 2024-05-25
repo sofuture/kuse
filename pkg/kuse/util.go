@@ -3,7 +3,6 @@ package kuse
 import (
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -23,10 +22,6 @@ func isYaml(filename string) bool {
 
 func trimYamlSuffix(filename string) string {
 	return strings.TrimSuffix(strings.TrimSuffix(filename, ".yaml"), ".yml")
-}
-
-func pathToTarget(path string) string {
-	return trimYamlSuffix(filepath.Base(path))
 }
 
 func isSymlink(filename string) bool {
