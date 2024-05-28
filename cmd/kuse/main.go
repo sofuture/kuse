@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"kuse/pkg/kuse"
+	"kuse/pkg/common"
 	"os"
 )
 
@@ -17,13 +17,13 @@ func getArgument() string {
 func main() {
 	arg := getArgument()
 
-	c, err := kuse.InitConfig()
+	c, err := common.InitConfig()
 	if err != nil {
 		fmt.Println("error:", err)
 		os.Exit(1)
 	}
 
-	s, err := kuse.LoadState(c)
+	s, err := common.LoadState(c)
 	if err != nil {
 		fmt.Println("error:", err)
 		os.Exit(1)

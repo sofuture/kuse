@@ -1,4 +1,4 @@
-package kuse
+package common
 
 import (
 	"errors"
