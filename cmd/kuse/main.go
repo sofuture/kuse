@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"kuse/pkg/common"
+	"github.com/sofuture/kuse/pkg/common"
 	"os"
 )
 

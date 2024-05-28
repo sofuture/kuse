@@ -1,4 +1,4 @@
-module kuse
+module github.com/sofuture/kuse
 
 go 1.21
 
