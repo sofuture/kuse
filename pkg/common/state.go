@@ -1,22 +1,26 @@
 package common
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
 	"path"
+	"strings"
 )
 
 func LoadState(c *Config) (*State, error) {
 	s := &State{config: c}
 	err := s.loadTargets()
 	if err != nil {
-		return nil, err
+		return s, err
 	}
 
 	err = s.loadCurrent()
 	if err != nil {
-		return nil, err
+		fmt.Println(err)
+		s.current.Name = "~none~"
+		return s, nil
 	}
 
 	return s, nil
@@ -47,6 +51,7 @@ func (s *State) loadTargets() error {
 
 func (s *State) loadCurrent() error {
 	if !isSymlink(s.config.Kubeconfig) {
+		s.current = Link{}
 		return errors.New("kubeconfig is not a symlink")
 	}
 
@@ -62,7 +67,11 @@ func (s *State) loadCurrent() error {
 
 func (s *State) switchLink(target string) error {
 	if !isSymlink(s.config.Kubeconfig) {
-		return errors.New("kubeconfig is not a symlink")
+		fmt.Printf("overwrite anyway? [y/N]: ")
+		c, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if strings.TrimSpace(strings.ToUpper(c)) != "Y" || err != nil {
+			return errors.New("leaving kubeconfig alone")
+		}
 	}
 
 	err := os.Remove(s.config.Kubeconfig)
