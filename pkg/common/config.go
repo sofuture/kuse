@@ -25,7 +25,7 @@ type Config struct {
 	Sources    string
 }
 
-func InitConfig() (*Config, error) {
+func InitConfig(kubeconfig string, sources string) (*Config, error) {
 	cfgLocation, err := xdg.ConfigFile(configFileLocation)
 	if err != nil {
 		fmt.Println("unable to locate", configFileLocation)
@@ -38,6 +38,18 @@ func InitConfig() (*Config, error) {
 	viper.SetConfigName(configFileName)
 	viper.SetConfigType(configFileExtension)
 	viper.AddConfigPath(path.Dir(cfgLocation))
+
+	if kubeconfig != "" {
+		viper.Set(keyKubeconfig, kubeconfig)
+	}
+
+	if sources != "" {
+		viper.Set(keySources, sources)
+	}
+
+	if kubeconfig != "" || sources != "" {
+		viper.WriteConfigAs(cfgLocation)
+	}
 
 	err = viper.ReadInConfig()
 	if err != nil {

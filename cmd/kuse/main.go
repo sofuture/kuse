@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/alexflint/go-arg"
 	"github.com/sofuture/kuse/pkg/common"
 	"os"
 )
@@ -14,10 +15,17 @@ func getArgument() string {
 	return args[0]
 }
 
-func main() {
-	arg := getArgument()
+var args struct {
+	Name       string `arg:"positional"`
+	Kubeconfig string
+	Sources    string
+	Short      bool
+}
 
-	c, err := common.InitConfig()
+func main() {
+	arg.MustParse(&args)
+
+	c, err := common.InitConfig(args.Kubeconfig, args.Sources)
 	if err != nil {
 		fmt.Println("error:", err)
 		os.Exit(1)
@@ -29,14 +37,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	if arg == "" {
+	if args.Short {
+		s.PrintShortStatusCommand()
+		os.Exit(0)
+	}
+
+	if args.Name == "" {
 		err := s.PrintStatusCommand()
 		if err != nil {
 			fmt.Println("error:", err)
 			os.Exit(1)
 		}
 	} else {
-		err := s.SetTarget(arg)
+		err := s.SetTarget(args.Name)
 		if err != nil {
 			fmt.Println("error:", err)
 			os.Exit(1)

@@ -88,6 +88,10 @@ func (s *State) switchLink(target string) error {
 	return nil
 }
 
+func (s *State) PrintShortStatusCommand() {
+	fmt.Println(s.current.Name)
+}
+
 func (s *State) PrintStatusCommand() error {
 	fmt.Println("kuse current target:", s.current.Name)
 	fmt.Println("available targets:", s.targets)
