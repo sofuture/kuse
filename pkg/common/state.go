@@ -50,9 +50,13 @@ func (s *State) loadTargets() error {
 }
 
 func (s *State) loadCurrent() error {
-	if !isSymlink(s.config.Kubeconfig) {
-		s.current = Link{}
-		return errors.New("kubeconfig is not a symlink")
+	if exists(s.config.Kubeconfig) {
+		if !isSymlink(s.config.Kubeconfig) {
+			s.current = Link{}
+			return errors.New("kubeconfig is not a symlink")
+		}
+	} else {
+		return errors.New("kubeconfig does not exist")
 	}
 
 	link, err := os.Readlink(s.config.Kubeconfig)
@@ -66,26 +70,32 @@ func (s *State) loadCurrent() error {
 }
 
 func (s *State) switchLink(target string) error {
-	if !isSymlink(s.config.Kubeconfig) {
-		fmt.Printf("overwrite anyway? [y/N]: ")
-		c, err := bufio.NewReader(os.Stdin).ReadString('\n')
-		if strings.TrimSpace(strings.ToUpper(c)) != "Y" || err != nil {
-			return errors.New("leaving kubeconfig alone")
+	if exists(s.config.Kubeconfig) {
+		if !isSymlink(s.config.Kubeconfig) {
+			fmt.Printf("overwrite anyway? [y/N]: ")
+			c, err := bufio.NewReader(os.Stdin).ReadString('\n')
+			if strings.TrimSpace(strings.ToUpper(c)) != "Y" || err != nil {
+				return errors.New("leaving kubeconfig alone")
+			}
+		}
+
+		err := os.Remove(s.config.Kubeconfig)
+		if err != nil {
+			return err
 		}
 	}
 
-	err := os.Remove(s.config.Kubeconfig)
-	if err != nil {
-		return err
-	}
-
-	err = os.Symlink(target, s.config.Kubeconfig)
+	err := os.Symlink(target, s.config.Kubeconfig)
 	if err != nil {
 		return err
 	}
 
 	fmt.Println("set kubeconfig to:", target)
 	return nil
+}
+
+func (s *State) PrintShortStatusCommand() {
+	fmt.Print(s.current.Name)
 }
 
 func (s *State) PrintStatusCommand() error {

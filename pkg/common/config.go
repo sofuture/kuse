@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"fmt"
 	"github.com/adrg/xdg"
 	"github.com/mitchellh/go-homedir"
@@ -25,7 +26,7 @@ type Config struct {
 	Sources    string
 }
 
-func InitConfig() (*Config, error) {
+func InitConfig(kubeconfig string, sources string) (*Config, error) {
 	cfgLocation, err := xdg.ConfigFile(configFileLocation)
 	if err != nil {
 		fmt.Println("unable to locate", configFileLocation)
@@ -39,17 +40,31 @@ func InitConfig() (*Config, error) {
 	viper.SetConfigType(configFileExtension)
 	viper.AddConfigPath(path.Dir(cfgLocation))
 
+	if kubeconfig != "" {
+		viper.Set(keyKubeconfig, kubeconfig)
+	}
+
+	if sources != "" {
+		viper.Set(keySources, sources)
+	}
+
+	if kubeconfig != "" || sources != "" {
+		err := viper.WriteConfigAs(cfgLocation)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	err = viper.ReadInConfig()
 	if err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if errors.As(err, &configFileNotFoundError) {
 			fmt.Println("No kuse configuration found, no sweat, I'll create one with defaults at", cfgLocation)
 			err := viper.WriteConfigAs(cfgLocation)
 			if err != nil {
 				fmt.Println(err)
 				return nil, err
 			}
-		} else {
-			return nil, err
 		}
 	}
 

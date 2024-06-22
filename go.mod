@@ -9,6 +9,8 @@ require (
 
 require (
 	github.com/adrg/xdg v0.4.0 // indirect
+	github.com/alexflint/go-arg v1.5.0 // indirect
+	github.com/alexflint/go-scalar v1.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
