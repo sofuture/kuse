@@ -1,6 +1,7 @@
 package common
 
 import (
+	"errors"
 	"os"
 	"path"
 	"strings"
@@ -30,6 +31,13 @@ func isSymlink(filename string) bool {
 		return false
 	}
 	return fi.Mode()&os.ModeSymlink == os.ModeSymlink
+}
+
+func exists(filename string) bool {
+	if _, err := os.Stat(filename); !errors.Is(err, os.ErrNotExist) {
+		return true
+	}
+	return false
 }
 
 func fileToLink(filename string) Link {
