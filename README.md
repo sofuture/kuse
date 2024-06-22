@@ -25,10 +25,14 @@ kuse current target: development
 available targets: [development production]
 
 -> % kuse production
-set kubeconfig to: /home/user/kubeconfigs/production.yaml
+set kubeconfig to: /home/jz/kubeconfigs/production.yaml
 
--> % ls -l ~/.kube/config
-lrwxrwxrwx /home/user/.kube/config -> /home/user/kubeconfigs/production.yaml
+-> % kuse
+kuse current target: production
+available targets: [development production]
+
+-> % kuse -short
+production%   
 ```
 
 ### But can't I use kubectl's built in context management?
