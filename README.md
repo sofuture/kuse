@@ -5,9 +5,23 @@
 It symlinks various kubeconfigs from a given directory to your main kubeconfig.
 
 ### How do I use it
+
+```
+Usage: main [--kubeconfig KUBECONFIG] [--sources SOURCES] [--short] [NAME]
+
+Positional arguments:
+  NAME
+
+Options:
+  --kubeconfig KUBECONFIG
+  --sources SOURCES
+  --short
+  --help, -h
+```
  
  - just run `kuse`, it will create a configuration file
  - in the configuration file `XDG_CONFIG_HOME/kuse/kuseconfig.yaml` you can set the location  of your kubeconfig (defaults to `~/.kube/config`) and your source kubeconfig directory (defaults to `~/kubeconfigs`)
+   - you can also use `--kubeconfig` or `--sources` at any time to set those values
  - run `kuse` to show the current kubeconfig in use
  - run `kuse <name>` to pick a different one
 
