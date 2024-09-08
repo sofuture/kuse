@@ -2,12 +2,12 @@
 
 `kuse` is a simple tool to manage your kubeconfig file with symlinks.
 
-It symlinks various kubeconfigs from a given directory to your main kubeconfig.
+It :just: symlinks various kubeconfigs from a given directory to your main kubeconfig.
 
 ### How do I use it
 
 ```
-Usage: main [--kubeconfig KUBECONFIG] [--sources SOURCES] [--short] [NAME]
+Usage: kuse [--kubeconfig KUBECONFIG] [--sources SOURCES] [--short] [NAME]
 
 Positional arguments:
   NAME
