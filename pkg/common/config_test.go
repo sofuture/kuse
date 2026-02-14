@@ -67,7 +67,7 @@ func TestInitConfig_ReturnsErrorForInvalidConfigFile(t *testing.T) {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
 
-	if err := os.WriteFile(configPath, []byte("kubeconfig: [unterminated\n"), 0o600); err != nil {
+	if err := os.WriteFile(configPath, []byte("kubeconfig: \"unterminated\n"), 0o600); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 
