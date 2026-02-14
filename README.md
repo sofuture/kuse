@@ -4,6 +4,16 @@
 
 It :just: symlinks various kubeconfigs from a given directory to your main kubeconfig.
 
+### Releases
+
+Versioned tags (`v*`) automatically trigger the GitHub Actions release workflow, which builds binaries for:
+
+- Linux (`amd64`, `arm64`)
+- macOS (`amd64`, `arm64`)
+- Windows (`amd64`)
+
+Each release includes platform archives and a SHA256 checksum file.
+
 ### How do I use it
 
 ```
