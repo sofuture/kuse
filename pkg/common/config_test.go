@@ -60,9 +60,12 @@ func TestInitConfig_PartialUpdatePreservesExistingValues(t *testing.T) {
 }
 
 func TestInitConfig_ReturnsErrorForInvalidConfigFile(t *testing.T) {
-	xdgConfigHome, _ := setupConfigTestEnv(t)
+	setupConfigTestEnv(t)
 
-	configPath := filepath.Join(xdgConfigHome, filepath.FromSlash(configFileLocation))
+	configPath, err := xdg.ConfigFile(configFileLocation)
+	if err != nil {
+		t.Fatalf("ConfigFile returned error: %v", err)
+	}
 	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
