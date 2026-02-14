@@ -1,6 +1,7 @@
 package common
 
 import (
+	"github.com/adrg/xdg"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,6 +14,11 @@ func setupConfigTestEnv(t *testing.T) (string, string) {
 	homeDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
 	t.Setenv("HOME", homeDir)
+	originalConfigHome := xdg.ConfigHome
+	xdg.ConfigHome = xdgConfigHome
+	t.Cleanup(func() {
+		xdg.ConfigHome = originalConfigHome
+	})
 
 	return xdgConfigHome, homeDir
 }
