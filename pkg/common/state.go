@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -41,8 +41,8 @@ func (s *State) loadTargets() error {
 	s.targets = make([]Link, 0)
 	for _, file := range files {
 		if isYaml(file.Name()) {
-			filepath := path.Join(s.config.Sources, file.Name())
-			s.targets = append(s.targets, fileToLink(filepath))
+			targetPath := filepath.Join(s.config.Sources, file.Name())
+			s.targets = append(s.targets, fileToLink(targetPath))
 		}
 	}
 
@@ -116,7 +116,7 @@ func (s *State) SetTarget(target string) error {
 	}
 
 	if !valid {
-		return errors.New(fmt.Sprintf("invalid target: %s", target))
+		return fmt.Errorf("invalid target: %s", target)
 	}
 
 	return s.switchLink(filename)

@@ -3,7 +3,7 @@ package common
 import (
 	"errors"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -34,16 +34,14 @@ func isSymlink(filename string) bool {
 }
 
 func exists(filename string) bool {
-	if _, err := os.Stat(filename); !errors.Is(err, os.ErrNotExist) {
-		return true
-	}
-	return false
+	_, err := os.Lstat(filename)
+	return !errors.Is(err, os.ErrNotExist)
 }
 
 func fileToLink(filename string) Link {
 	return Link{
-		Name:      trimYamlSuffix(path.Base(filename)),
+		Name:      trimYamlSuffix(filepath.Base(filename)),
 		File:      filename,
-		Extension: path.Ext(filename),
+		Extension: filepath.Ext(filename),
 	}
 }
