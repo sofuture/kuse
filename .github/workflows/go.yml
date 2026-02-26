@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
 jobs:
 
   build:
@@ -24,3 +27,17 @@ jobs:
 
     - name: Test
       run: go test -v ./...
+
+    - name: Install govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+    - name: Vulnerability scan
+      continue-on-error: true
+      run: "$(go env GOPATH)/bin/govulncheck" ./...
+
+    - name: Install gosec
+      run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+    - name: Security static analysis (non-blocking)
+      continue-on-error: true
+      run: "$(go env GOPATH)/bin/gosec" ./...

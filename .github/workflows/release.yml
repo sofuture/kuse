@@ -80,6 +80,8 @@ jobs:
     needs: build
     permissions:
       contents: write
+      attestations: write
+      id-token: write
 
     steps:
       - name: Download build artifacts
@@ -94,6 +96,11 @@ jobs:
           set -euo pipefail
           cd dist
           sha256sum kuse_* > "kuse_${GITHUB_REF_NAME}_checksums.txt"
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "dist/kuse_*"
 
       - name: Publish GitHub release assets
         uses: softprops/action-gh-release@v2
