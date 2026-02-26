@@ -6,7 +6,7 @@ import (
 	"github.com/adrg/xdg"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
-	"path"
+	"path/filepath"
 )
 
 const (
@@ -33,47 +33,43 @@ func InitConfig(kubeconfig string, sources string) (*Config, error) {
 		return nil, err
 	}
 
-	viper.SetDefault(keyKubeconfig, defaultKubeconfig)
-	viper.SetDefault(keySources, defaultSources)
+	config := viper.New()
+	config.SetDefault(keyKubeconfig, defaultKubeconfig)
+	config.SetDefault(keySources, defaultSources)
+	config.SetConfigName(configFileName)
+	config.SetConfigType(configFileExtension)
+	config.AddConfigPath(filepath.Dir(cfgLocation))
 
-	viper.SetConfigName(configFileName)
-	viper.SetConfigType(configFileExtension)
-	viper.AddConfigPath(path.Dir(cfgLocation))
-
-	if kubeconfig != "" {
-		viper.Set(keyKubeconfig, kubeconfig)
-	}
-
-	if sources != "" {
-		viper.Set(keySources, sources)
-	}
-
-	if kubeconfig != "" || sources != "" {
-		err := viper.WriteConfigAs(cfgLocation)
-		if err != nil {
+	configBootstrapNeeded := false
+	if err := config.ReadInConfig(); err != nil {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if errors.As(err, &configFileNotFoundError) {
+			configBootstrapNeeded = true
+		} else {
 			return nil, err
 		}
 	}
 
-	err = viper.ReadInConfig()
-	if err != nil {
-		var configFileNotFoundError viper.ConfigFileNotFoundError
-		if errors.As(err, &configFileNotFoundError) {
-			fmt.Println("No kuse configuration found, no sweat, I'll create one with defaults at", cfgLocation)
-			err := viper.WriteConfigAs(cfgLocation)
-			if err != nil {
-				fmt.Println(err)
-				return nil, err
-			}
+	if kubeconfig != "" {
+		config.Set(keyKubeconfig, kubeconfig)
+	}
+
+	if sources != "" {
+		config.Set(keySources, sources)
+	}
+
+	if configBootstrapNeeded || kubeconfig != "" || sources != "" {
+		if err := config.WriteConfigAs(cfgLocation); err != nil {
+			return nil, err
 		}
 	}
 
-	expandedKubeconfig, err := homedir.Expand(viper.GetString(keyKubeconfig))
+	expandedKubeconfig, err := homedir.Expand(config.GetString(keyKubeconfig))
 	if err != nil {
 		return nil, err
 	}
 
-	expandedSources, err := homedir.Expand(viper.GetString(keySources))
+	expandedSources, err := homedir.Expand(config.GetString(keySources))
 	if err != nil {
 		return nil, err
 	}

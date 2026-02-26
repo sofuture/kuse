@@ -3,7 +3,7 @@ package common
 import (
 	"errors"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -41,9 +41,17 @@ func exists(filename string) bool {
 }
 
 func fileToLink(filename string) Link {
+	normalizedPath := filename
+	if strings.Contains(normalizedPath, "\\") {
+		normalizedPath = strings.ReplaceAll(normalizedPath, "\\", string(filepath.Separator))
+	}
+
+	baseName := filepath.Base(normalizedPath)
+	extension := filepath.Ext(baseName)
+
 	return Link{
-		Name:      trimYamlSuffix(path.Base(filename)),
+		Name:      trimYamlSuffix(baseName),
 		File:      filename,
-		Extension: path.Ext(filename),
+		Extension: extension,
 	}
 }

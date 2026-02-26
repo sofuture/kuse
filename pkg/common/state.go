@@ -5,25 +5,30 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 )
 
 func LoadState(c *Config) (*State, error) {
 	s := &State{config: c}
-	err := s.loadTargets()
-	if err != nil {
+	if err := s.loadTargets(); err != nil {
 		return s, err
 	}
 
-	err = s.loadCurrent()
-	if err != nil {
-		fmt.Println(err)
+	if err := s.loadCurrent(); err != nil {
 		s.current.Name = "~none~"
-		return s, nil
+		return s, &StateWarning{Err: err}
 	}
 
 	return s, nil
+}
+
+type StateWarning struct {
+	Err error
+}
+
+func (w *StateWarning) Error() string {
+	return w.Err.Error()
 }
 
 type State struct {
@@ -40,10 +45,20 @@ func (s *State) loadTargets() error {
 
 	s.targets = make([]Link, 0)
 	for _, file := range files {
-		if isYaml(file.Name()) {
-			filepath := path.Join(s.config.Sources, file.Name())
-			s.targets = append(s.targets, fileToLink(filepath))
+		if !isYaml(file.Name()) {
+			continue
 		}
+
+		targetPath := filepath.Join(s.config.Sources, file.Name())
+		info, err := os.Stat(targetPath)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			continue
+		}
+
+		s.targets = append(s.targets, fileToLink(targetPath))
 	}
 
 	return nil
@@ -116,7 +131,7 @@ func (s *State) SetTarget(target string) error {
 	}
 
 	if !valid {
-		return errors.New(fmt.Sprintf("invalid target: %s", target))
+		return fmt.Errorf("invalid target: %s", target)
 	}
 
 	return s.switchLink(filename)
