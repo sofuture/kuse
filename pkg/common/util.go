@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,6 +55,7 @@ func fileToLink(filename string) Link {
 }
 
 // expandHome expands a leading "~" or "~/" using the current user's home directory.
+// Other "~..." forms (e.g. "~otheruser") are rejected, matching go-homedir's behavior.
 func expandHome(p string) (string, error) {
 	if p == "~" {
 		return os.UserHomeDir()
@@ -65,5 +67,21 @@ func expandHome(p string) (string, error) {
 		}
 		return filepath.Join(home, p[2:]), nil
 	}
+	if strings.HasPrefix(p, "~") {
+		return "", fmt.Errorf("cannot expand user-specific home dir")
+	}
 	return p, nil
+}
+
+// resolvePath expands "~"/"~/" and converts the result to an absolute path.
+func resolvePath(p string) (string, error) {
+	expanded, err := expandHome(p)
+	if err != nil {
+		return "", err
+	}
+	abs, err := filepath.Abs(expanded)
+	if err != nil {
+		return "", err
+	}
+	return abs, nil
 }

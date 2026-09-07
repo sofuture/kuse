@@ -11,29 +11,27 @@ import (
 // version is set at build time via -ldflags.
 var version = "dev"
 
-type args struct {
+type cliArgs struct {
 	Name       string `arg:"positional" help:"kubeconfig target name to activate"`
 	Kubeconfig string `arg:"--kubeconfig" help:"path to the active kubeconfig symlink"`
 	Sources    string `arg:"--sources" help:"directory containing kubeconfig files"`
 	Short      bool   `arg:"--short" help:"print only the current target name"`
 	Force      bool   `arg:"--force,-f" help:"overwrite a non-symlink kubeconfig without prompting"`
-	Version    bool   `arg:"--version" help:"print version and exit"`
 }
 
-func (args) Description() string {
+func (cliArgs) Description() string {
 	return "kuse manages your kubeconfig via symlinks to named configs in a sources directory."
 }
 
+func (cliArgs) Version() string {
+	return version
+}
+
 func main() {
-	var args args
-	arg.MustParse(&args)
+	var opts cliArgs
+	arg.MustParse(&opts)
 
-	if args.Version {
-		fmt.Println(version)
-		return
-	}
-
-	c, err := common.InitConfig(args.Kubeconfig, args.Sources)
+	c, err := common.InitConfig(opts.Kubeconfig, opts.Sources)
 	if err != nil {
 		fatal(err)
 	}
@@ -43,17 +41,17 @@ func main() {
 		fatal(err)
 	}
 
-	if args.Short {
+	if opts.Short {
 		s.PrintShortStatusCommand()
 		return
 	}
 
-	if args.Name == "" {
+	if opts.Name == "" {
 		s.PrintStatusCommand()
 		return
 	}
 
-	if err := s.SetTarget(args.Name, args.Force); err != nil {
+	if err := s.SetTarget(opts.Name, opts.Force); err != nil {
 		fatal(err)
 	}
 }

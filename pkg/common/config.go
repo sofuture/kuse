@@ -68,9 +68,19 @@ func InitConfig(kubeconfig string, sources string) (*Config, error) {
 		raw.Sources = sources
 	}
 
+	expandedKubeconfig, err := resolvePath(raw.Kubeconfig)
+	if err != nil {
+		return nil, fmt.Errorf("expand kubeconfig path: %w", err)
+	}
+	expandedSources, err := resolvePath(raw.Sources)
+	if err != nil {
+		return nil, fmt.Errorf("expand sources path: %w", err)
+	}
+
+	creatingDefaults := !configExists && kubeconfig == "" && sources == ""
 	shouldWrite := !configExists || kubeconfig != "" || sources != ""
 	if shouldWrite {
-		if !configExists {
+		if creatingDefaults {
 			fmt.Fprintf(os.Stderr, "No kuse configuration found; creating defaults at %s\n", cfgLocation)
 		}
 		if err := writeFileConfig(cfgLocation, raw); err != nil {
@@ -78,17 +88,12 @@ func InitConfig(kubeconfig string, sources string) (*Config, error) {
 		}
 	}
 
-	expandedKubeconfig, err := expandHome(raw.Kubeconfig)
-	if err != nil {
-		return nil, fmt.Errorf("expand kubeconfig path: %w", err)
-	}
-	expandedSources, err := expandHome(raw.Sources)
-	if err != nil {
-		return nil, fmt.Errorf("expand sources path: %w", err)
-	}
-
-	if err := os.MkdirAll(expandedSources, 0o755); err != nil {
-		return nil, fmt.Errorf("create sources directory: %w", err)
+	// Only auto-create the sources directory for a fresh default config.
+	// Explicit --sources overrides should fail clearly if the path is missing/typo'd.
+	if creatingDefaults {
+		if err := os.MkdirAll(expandedSources, 0o755); err != nil {
+			return nil, fmt.Errorf("create sources directory: %w", err)
+		}
 	}
 
 	return &Config{

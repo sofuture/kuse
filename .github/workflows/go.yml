@@ -18,11 +18,8 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Vet
-        run: make vet
-
-      - name: Test
-        run: go test -race -count=1 ./...
+      - name: Check
+        run: make check
 
       - name: Build
         run: make

@@ -16,7 +16,7 @@ Each release includes platform archives and a SHA256 checksum file.
 
 ### Install
 
-Download a release binary, or build from source:
+Download a release binary, or build from source (requires **Go 1.25+**):
 
 ```shell
 go install github.com/sofuture/kuse/cmd/kuse@latest
@@ -27,7 +27,9 @@ make
 ### How do I use it
 
 ```
-Usage: kuse [--kubeconfig KUBECONFIG] [--sources SOURCES] [--short] [--force] [--version] [NAME]
+kuse manages your kubeconfig via symlinks to named configs in a sources directory.
+v0.1.0
+Usage: kuse [--kubeconfig KUBECONFIG] [--sources SOURCES] [--short] [--force] [NAME]
 
 Positional arguments:
   NAME                   kubeconfig target name to activate
@@ -38,15 +40,16 @@ Options:
   --sources SOURCES      directory containing kubeconfig files
   --short                print only the current target name
   --force, -f            overwrite a non-symlink kubeconfig without prompting
-  --version              print version and exit
   --help, -h             display this help and exit
+  --version              display version and exit
 ```
 
 - run `kuse` once to create a configuration file with defaults
 - config lives at `$XDG_CONFIG_HOME/kuse/kuseconfig.yaml` (typically `~/.config/kuse/kuseconfig.yaml`)
   - `kubeconfig` defaults to `~/.kube/config`
-  - `sources` defaults to `~/kubeconfigs` (created automatically if missing)
+  - `sources` defaults to `~/kubeconfigs` (created automatically on first run)
 - use `--kubeconfig` or `--sources` to override and persist those values (partial overrides keep other saved settings)
+- only `*.yaml` / `*.yml` files in the sources directory are treated as targets; hidden files (names starting with `.`) are skipped
 - run `kuse` to show the current kubeconfig in use
 - run `kuse <name>` to switch to a different target
 - run `kuse --force <name>` to replace a regular kubeconfig file without prompting

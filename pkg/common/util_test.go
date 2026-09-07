@@ -3,6 +3,7 @@ package common
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -68,6 +69,26 @@ func TestExpandHome(t *testing.T) {
 	}
 	if got != "/abs/path" {
 		t.Fatalf("expandHome(/abs/path) = %q, want /abs/path", got)
+	}
+
+	if _, err := expandHome("~someuser/cfgs"); err == nil {
+		t.Fatal("expected error for user-specific home dir")
+	} else if !strings.Contains(err.Error(), "cannot expand user-specific home dir") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestResolvePathMakesAbsolute(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+
+	got, err := resolvePath("relative/cfgs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(dir, "relative", "cfgs")
+	if got != want {
+		t.Fatalf("resolvePath(relative/cfgs) = %q, want %q", got, want)
 	}
 }
 

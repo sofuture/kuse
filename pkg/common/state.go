@@ -5,15 +5,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
+	"time"
 )
 
 // State is the loaded set of available kubeconfig targets and the current selection.
 type State struct {
-	targets []Link
-	current Link
-	config  *Config
+	targets    []Link
+	current    Link
+	currentErr error
+	config     *Config
 }
 
 // LoadState discovers available targets and the currently linked kubeconfig.
@@ -25,6 +27,7 @@ func LoadState(c *Config) (*State, error) {
 
 	if err := s.loadCurrent(); err != nil {
 		s.current.Name = "~none~"
+		s.currentErr = err
 	}
 
 	return s, nil
@@ -52,8 +55,8 @@ func (s *State) loadTargets() error {
 		s.targets = append(s.targets, fileToLink(fullPath))
 	}
 
-	sort.Slice(s.targets, func(i, j int) bool {
-		return s.targets[i].Name < s.targets[j].Name
+	slices.SortFunc(s.targets, func(a, b Link) int {
+		return strings.Compare(a.Name, b.Name)
 	})
 
 	return nil
@@ -64,7 +67,7 @@ func (s *State) loadCurrent() error {
 		return fmt.Errorf("kubeconfig does not exist: %s", s.config.Kubeconfig)
 	}
 	if !isSymlink(s.config.Kubeconfig) {
-		return fmt.Errorf("kubeconfig is not a symlink: %s", s.config.Kubeconfig)
+		return fmt.Errorf("kubeconfig is not a symlink: %s (use kuse --force <name> to replace it)", s.config.Kubeconfig)
 	}
 
 	link, err := os.Readlink(s.config.Kubeconfig)
@@ -83,27 +86,30 @@ func (s *State) loadCurrent() error {
 }
 
 func (s *State) switchLink(target string, force bool) error {
-	if exists(s.config.Kubeconfig) {
-		if !isSymlink(s.config.Kubeconfig) {
-			if !force {
-				fmt.Fprint(os.Stderr, "kubeconfig is not a symlink; overwrite anyway? [y/N]: ")
-				c, err := bufio.NewReader(os.Stdin).ReadString('\n')
-				if err != nil || strings.TrimSpace(strings.ToUpper(c)) != "Y" {
-					return fmt.Errorf("leaving kubeconfig alone")
-				}
+	dest := s.config.Kubeconfig
+	if exists(dest) && !isSymlink(dest) {
+		if !force {
+			fmt.Fprint(os.Stderr, "kubeconfig is not a symlink; overwrite anyway? [y/N]: ")
+			c, err := bufio.NewReader(os.Stdin).ReadString('\n')
+			if err != nil || strings.TrimSpace(strings.ToUpper(c)) != "Y" {
+				return fmt.Errorf("leaving kubeconfig alone")
 			}
-		}
-		if err := os.Remove(s.config.Kubeconfig); err != nil {
-			return fmt.Errorf("remove existing kubeconfig: %w", err)
 		}
 	}
 
-	if err := os.MkdirAll(filepath.Dir(s.config.Kubeconfig), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		return fmt.Errorf("create kubeconfig directory: %w", err)
 	}
 
-	if err := os.Symlink(target, s.config.Kubeconfig); err != nil {
+	// Create the new symlink under a temp name, then rename over the destination so
+	// a failure never leaves the user without a kubeconfig after --force.
+	tmp := filepath.Join(filepath.Dir(dest), fmt.Sprintf(".kuse-%d-%d", os.Getpid(), time.Now().UnixNano()))
+	if err := os.Symlink(target, tmp); err != nil {
 		return fmt.Errorf("create symlink: %w", err)
+	}
+	if err := os.Rename(tmp, dest); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("replace kubeconfig: %w", err)
 	}
 
 	fmt.Println("set kubeconfig to:", target)
@@ -116,13 +122,13 @@ func (s *State) PrintShortStatusCommand() {
 }
 
 // PrintStatusCommand prints the current target and available targets.
+// If the current kubeconfig could not be resolved, the reason is written to stderr.
 func (s *State) PrintStatusCommand() {
-	fmt.Println("kuse current target:", s.current.Name)
-	names := make([]string, len(s.targets))
-	for i, t := range s.targets {
-		names[i] = t.Name
+	if s.currentErr != nil {
+		fmt.Fprintln(os.Stderr, s.currentErr)
 	}
-	fmt.Println("available targets:", names)
+	fmt.Println("kuse current target:", s.current.Name)
+	fmt.Println("available targets:", s.targetNames())
 }
 
 // SetTarget switches the kubeconfig symlink to the named target.
@@ -136,13 +142,7 @@ func (s *State) SetTarget(target string, force bool) error {
 	return fmt.Errorf("invalid target: %s", target)
 }
 
-// CurrentName returns the current target name.
-func (s *State) CurrentName() string {
-	return s.current.Name
-}
-
-// TargetNames returns sorted available target names.
-func (s *State) TargetNames() []string {
+func (s *State) targetNames() []string {
 	names := make([]string, len(s.targets))
 	for i, t := range s.targets {
 		names[i] = t.Name
