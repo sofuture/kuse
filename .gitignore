@@ -1,2 +1,6 @@
 build/
+dist/
 .idea
+*.exe
+*.test
+coverage.out

@@ -7,20 +7,22 @@ on:
     branches: [ "main" ]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version-file: go.mod
-        cache: true
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
 
-    - name: Build
-      run: make
+      - name: Vet
+        run: make vet
 
-    - name: Test
-      run: go test -v ./...
+      - name: Test
+        run: go test -race -count=1 ./...
+
+      - name: Build
+        run: make

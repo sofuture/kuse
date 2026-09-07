@@ -2,57 +2,62 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/alexflint/go-arg"
 	"github.com/sofuture/kuse/pkg/common"
-	"os"
 )
 
-func getArgument() string {
-	args := os.Args[1:]
-	if len(args) == 0 {
-		return ""
-	}
-	return args[0]
+// version is set at build time via -ldflags.
+var version = "dev"
+
+type args struct {
+	Name       string `arg:"positional" help:"kubeconfig target name to activate"`
+	Kubeconfig string `arg:"--kubeconfig" help:"path to the active kubeconfig symlink"`
+	Sources    string `arg:"--sources" help:"directory containing kubeconfig files"`
+	Short      bool   `arg:"--short" help:"print only the current target name"`
+	Version    bool   `arg:"--version" help:"print version and exit"`
 }
 
-var args struct {
-	Name       string `arg:"positional"`
-	Kubeconfig string
-	Sources    string
-	Short      bool
+func (args) Description() string {
+	return "kuse manages your kubeconfig via symlinks to named configs in a sources directory."
 }
 
 func main() {
+	var args args
 	arg.MustParse(&args)
+
+	if args.Version {
+		fmt.Println(version)
+		return
+	}
 
 	c, err := common.InitConfig(args.Kubeconfig, args.Sources)
 	if err != nil {
-		fmt.Println("error:", err)
-		os.Exit(1)
+		fatal(err)
 	}
 
 	s, err := common.LoadState(c)
 	if err != nil {
-		fmt.Println("error:", err)
-		os.Exit(1)
+		fatal(err)
 	}
 
 	if args.Short {
 		s.PrintShortStatusCommand()
-		os.Exit(0)
+		return
 	}
 
 	if args.Name == "" {
-		err := s.PrintStatusCommand()
-		if err != nil {
-			fmt.Println("error:", err)
-			os.Exit(1)
-		}
-	} else {
-		err := s.SetTarget(args.Name)
-		if err != nil {
-			fmt.Println("error:", err)
-			os.Exit(1)
-		}
+		s.PrintStatusCommand()
+		return
 	}
+
+	if err := s.SetTarget(args.Name); err != nil {
+		fatal(err)
+	}
+}
+
+func fatal(err error) {
+	fmt.Fprintln(os.Stderr, "error:", err)
+	os.Exit(1)
 }

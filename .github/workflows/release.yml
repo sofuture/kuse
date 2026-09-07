@@ -29,10 +29,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -54,7 +54,8 @@ jobs:
           fi
 
           package_dir="$(mktemp -d)"
-          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o "${package_dir}/${binary_name}" ./cmd/kuse
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" \
+            -o "${package_dir}/${binary_name}" ./cmd/kuse
 
           if [ "${GOOS}" = "windows" ]; then
             (
@@ -68,7 +69,7 @@ jobs:
           rm -rf "${package_dir}"
 
       - name: Upload archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.goos }}-${{ matrix.goarch }}
           path: dist/kuse_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}.*
@@ -83,7 +84,7 @@ jobs:
 
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: release-*
           path: dist
@@ -96,7 +97,7 @@ jobs:
           sha256sum kuse_* > "kuse_${GITHUB_REF_NAME}_checksums.txt"
 
       - name: Publish GitHub release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/kuse_*
           generate_release_notes: true

@@ -1,12 +1,12 @@
 package common
 
 import (
-	"errors"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 )
 
+// Link represents a named kubeconfig file under the sources directory.
 type Link struct {
 	Name      string
 	File      string
@@ -18,11 +18,16 @@ func (l Link) String() string {
 }
 
 func isYaml(filename string) bool {
-	return strings.HasSuffix(filename, ".yml") || strings.HasSuffix(filename, ".yaml")
+	ext := strings.ToLower(filepath.Ext(filename))
+	return ext == ".yml" || ext == ".yaml"
 }
 
 func trimYamlSuffix(filename string) string {
-	return strings.TrimSuffix(strings.TrimSuffix(filename, ".yaml"), ".yml")
+	ext := strings.ToLower(filepath.Ext(filename))
+	if ext == ".yaml" || ext == ".yml" {
+		return strings.TrimSuffix(filename, filepath.Ext(filename))
+	}
+	return filename
 }
 
 func isSymlink(filename string) bool {
@@ -30,20 +35,35 @@ func isSymlink(filename string) bool {
 	if err != nil {
 		return false
 	}
-	return fi.Mode()&os.ModeSymlink == os.ModeSymlink
+	return fi.Mode()&os.ModeSymlink != 0
 }
 
+// exists reports whether path exists, including as a dangling symlink.
 func exists(filename string) bool {
-	if _, err := os.Stat(filename); !errors.Is(err, os.ErrNotExist) {
-		return true
-	}
-	return false
+	_, err := os.Lstat(filename)
+	return err == nil
 }
 
 func fileToLink(filename string) Link {
+	base := filepath.Base(filename)
 	return Link{
-		Name:      trimYamlSuffix(path.Base(filename)),
+		Name:      trimYamlSuffix(base),
 		File:      filename,
-		Extension: path.Ext(filename),
+		Extension: filepath.Ext(base),
 	}
+}
+
+// expandHome expands a leading "~" or "~/" using the current user's home directory.
+func expandHome(p string) (string, error) {
+	if p == "~" {
+		return os.UserHomeDir()
+	}
+	if strings.HasPrefix(p, "~/") || strings.HasPrefix(p, `~\`) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(home, p[2:]), nil
+	}
+	return p, nil
 }
