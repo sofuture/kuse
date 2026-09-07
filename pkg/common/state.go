@@ -2,122 +2,150 @@ package common
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
+	"slices"
 	"strings"
+	"time"
 )
 
+// State is the loaded set of available kubeconfig targets and the current selection.
+type State struct {
+	targets    []Link
+	current    Link
+	currentErr error
+	config     *Config
+}
+
+// LoadState discovers available targets and the currently linked kubeconfig.
 func LoadState(c *Config) (*State, error) {
 	s := &State{config: c}
-	err := s.loadTargets()
-	if err != nil {
-		return s, err
+	if err := s.loadTargets(); err != nil {
+		return nil, err
 	}
 
-	err = s.loadCurrent()
-	if err != nil {
-		fmt.Println(err)
+	if err := s.loadCurrent(); err != nil {
 		s.current.Name = "~none~"
-		return s, nil
+		s.currentErr = err
 	}
 
 	return s, nil
 }
 
-type State struct {
-	targets []Link
-	current Link
-	config  *Config
-}
-
 func (s *State) loadTargets() error {
 	files, err := os.ReadDir(s.config.Sources)
 	if err != nil {
-		return err
+		return fmt.Errorf("read sources directory: %w", err)
 	}
 
-	s.targets = make([]Link, 0)
+	s.targets = make([]Link, 0, len(files))
 	for _, file := range files {
-		if isYaml(file.Name()) {
-			filepath := path.Join(s.config.Sources, file.Name())
-			s.targets = append(s.targets, fileToLink(filepath))
+		if file.IsDir() {
+			continue
 		}
+		name := file.Name()
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+		if !isYaml(name) {
+			continue
+		}
+		fullPath := filepath.Join(s.config.Sources, name)
+		s.targets = append(s.targets, fileToLink(fullPath))
 	}
+
+	slices.SortFunc(s.targets, func(a, b Link) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	return nil
 }
 
 func (s *State) loadCurrent() error {
-	if exists(s.config.Kubeconfig) {
-		if !isSymlink(s.config.Kubeconfig) {
-			s.current = Link{}
-			return errors.New("kubeconfig is not a symlink")
-		}
-	} else {
-		return errors.New("kubeconfig does not exist")
+	if !exists(s.config.Kubeconfig) {
+		return fmt.Errorf("kubeconfig does not exist: %s", s.config.Kubeconfig)
+	}
+	if !isSymlink(s.config.Kubeconfig) {
+		return fmt.Errorf("kubeconfig is not a symlink: %s (use kuse --force <name> to replace it)", s.config.Kubeconfig)
 	}
 
 	link, err := os.Readlink(s.config.Kubeconfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("read kubeconfig symlink: %w", err)
 	}
 
-	s.current = fileToLink(link)
+	// Resolve relative symlink targets against the kubeconfig directory.
+	if !filepath.IsAbs(link) {
+		link = filepath.Join(filepath.Dir(s.config.Kubeconfig), link)
+	}
+	link = filepath.Clean(link)
 
+	s.current = fileToLink(link)
 	return nil
 }
 
-func (s *State) switchLink(target string) error {
-	if exists(s.config.Kubeconfig) {
-		if !isSymlink(s.config.Kubeconfig) {
-			fmt.Printf("overwrite anyway? [y/N]: ")
+func (s *State) switchLink(target string, force bool) error {
+	dest := s.config.Kubeconfig
+	if exists(dest) && !isSymlink(dest) {
+		if !force {
+			fmt.Fprint(os.Stderr, "kubeconfig is not a symlink; overwrite anyway? [y/N]: ")
 			c, err := bufio.NewReader(os.Stdin).ReadString('\n')
-			if strings.TrimSpace(strings.ToUpper(c)) != "Y" || err != nil {
-				return errors.New("leaving kubeconfig alone")
+			if err != nil || strings.TrimSpace(strings.ToUpper(c)) != "Y" {
+				return fmt.Errorf("leaving kubeconfig alone")
 			}
-		}
-
-		err := os.Remove(s.config.Kubeconfig)
-		if err != nil {
-			return err
 		}
 	}
 
-	err := os.Symlink(target, s.config.Kubeconfig)
-	if err != nil {
-		return err
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return fmt.Errorf("create kubeconfig directory: %w", err)
+	}
+
+	// Create the new symlink under a temp name, then rename over the destination so
+	// a failure never leaves the user without a kubeconfig after --force.
+	tmp := filepath.Join(filepath.Dir(dest), fmt.Sprintf(".kuse-%d-%d", os.Getpid(), time.Now().UnixNano()))
+	if err := os.Symlink(target, tmp); err != nil {
+		return fmt.Errorf("create symlink: %w", err)
+	}
+	if err := os.Rename(tmp, dest); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("replace kubeconfig: %w", err)
 	}
 
 	fmt.Println("set kubeconfig to:", target)
 	return nil
 }
 
+// PrintShortStatusCommand prints only the current target name (no trailing newline).
 func (s *State) PrintShortStatusCommand() {
 	fmt.Print(s.current.Name)
 }
 
-func (s *State) PrintStatusCommand() error {
+// PrintStatusCommand prints the current target and available targets.
+// If the current kubeconfig could not be resolved, the reason is written to stderr.
+func (s *State) PrintStatusCommand() {
+	if s.currentErr != nil {
+		fmt.Fprintln(os.Stderr, s.currentErr)
+	}
 	fmt.Println("kuse current target:", s.current.Name)
-	fmt.Println("available targets:", s.targets)
-	return nil
+	fmt.Println("available targets:", s.targetNames())
 }
 
-func (s *State) SetTarget(target string) error {
-	valid := false
-	filename := ""
+// SetTarget switches the kubeconfig symlink to the named target.
+// When force is true, a non-symlink kubeconfig is overwritten without prompting.
+func (s *State) SetTarget(target string, force bool) error {
 	for _, t := range s.targets {
 		if t.Name == target {
-			valid = true
-			filename = t.File
-			break
+			return s.switchLink(t.File, force)
 		}
 	}
+	return fmt.Errorf("invalid target: %s", target)
+}
 
-	if !valid {
-		return errors.New(fmt.Sprintf("invalid target: %s", target))
+func (s *State) targetNames() []string {
+	names := make([]string, len(s.targets))
+	for i, t := range s.targets {
+		names[i] = t.Name
 	}
-
-	return s.switchLink(filename)
+	return names
 }
