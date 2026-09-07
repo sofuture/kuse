@@ -247,15 +247,19 @@ func TestPrintStatusCommandWritesCurrentError(t *testing.T) {
 	}
 	old := os.Stderr
 	os.Stderr = w
+	t.Cleanup(func() {
+		os.Stderr = old
+		_ = w.Close()
+		_ = r.Close()
+	})
+
 	s.PrintStatusCommand()
 	_ = w.Close()
-	os.Stderr = old
 
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, r); err != nil {
 		t.Fatal(err)
 	}
-	_ = r.Close()
 	out := buf.String()
 	if !strings.Contains(out, "kubeconfig is not a symlink") {
 		t.Fatalf("stderr = %q, want symlink error", out)

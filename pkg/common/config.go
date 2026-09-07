@@ -78,21 +78,29 @@ func InitConfig(kubeconfig string, sources string) (*Config, error) {
 	}
 
 	creatingDefaults := !configExists && kubeconfig == "" && sources == ""
+
+	// Ensure sources is usable before persisting anything, so a typo'd --sources
+	// does not leave a broken config behind.
+	if creatingDefaults {
+		if err := os.MkdirAll(expandedSources, 0o755); err != nil {
+			return nil, fmt.Errorf("create sources directory: %w", err)
+		}
+	} else if err := requireSourcesDir(expandedSources); err != nil {
+		return nil, err
+	}
+
 	shouldWrite := !configExists || kubeconfig != "" || sources != ""
 	if shouldWrite {
 		if creatingDefaults {
 			fmt.Fprintf(os.Stderr, "No kuse configuration found; creating defaults at %s\n", cfgLocation)
 		}
-		if err := writeFileConfig(cfgLocation, raw); err != nil {
+		// Persist resolved absolute paths so relative CLI values do not change
+		// meaning when the working directory changes.
+		if err := writeFileConfig(cfgLocation, fileConfig{
+			Kubeconfig: expandedKubeconfig,
+			Sources:    expandedSources,
+		}); err != nil {
 			return nil, err
-		}
-	}
-
-	// Only auto-create the sources directory for a fresh default config.
-	// Explicit --sources overrides should fail clearly if the path is missing/typo'd.
-	if creatingDefaults {
-		if err := os.MkdirAll(expandedSources, 0o755); err != nil {
-			return nil, fmt.Errorf("create sources directory: %w", err)
 		}
 	}
 
@@ -100,6 +108,17 @@ func InitConfig(kubeconfig string, sources string) (*Config, error) {
 		Kubeconfig: expandedKubeconfig,
 		Sources:    expandedSources,
 	}, nil
+}
+
+func requireSourcesDir(path string) error {
+	st, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("sources directory: %w", err)
+	}
+	if !st.IsDir() {
+		return fmt.Errorf("sources is not a directory: %s", path)
+	}
+	return nil
 }
 
 func readFileConfig(path string) (fileConfig, error) {
