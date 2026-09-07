@@ -3,24 +3,26 @@ package common
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
 	"github.com/adrg/xdg"
-	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 const (
-	configFileName      = "kuseconfig"
-	configFileExtension = "yaml"
-	configFileLocation  = "kuse/" + configFileName + "." + configFileExtension
+	configFileLocation = "kuse/kuseconfig.yaml"
 
 	defaultKubeconfig = "~/.kube/config"
 	defaultSources    = "~/kubeconfigs"
-
-	keyKubeconfig = "kubeconfig"
-	keySources    = "sources"
 )
+
+// fileConfig is the on-disk YAML shape (kept stable for existing installs).
+type fileConfig struct {
+	Kubeconfig string `yaml:"kubeconfig"`
+	Sources    string `yaml:"sources"`
+}
 
 // Config holds resolved filesystem paths used by kuse.
 type Config struct {
@@ -35,43 +37,52 @@ func InitConfig(kubeconfig string, sources string) (*Config, error) {
 		return nil, fmt.Errorf("unable to locate %s: %w", configFileLocation, err)
 	}
 
-	v := viper.New()
-	v.SetDefault(keyKubeconfig, defaultKubeconfig)
-	v.SetDefault(keySources, defaultSources)
-	v.SetConfigName(configFileName)
-	v.SetConfigType(configFileExtension)
-	v.AddConfigPath(filepath.Dir(cfgLocation))
+	raw := fileConfig{
+		Kubeconfig: defaultKubeconfig,
+		Sources:    defaultSources,
+	}
+
+	_, statErr := os.Stat(cfgLocation)
+	configExists := statErr == nil
+	if statErr != nil && !errors.Is(statErr, fs.ErrNotExist) {
+		return nil, fmt.Errorf("stat config: %w", statErr)
+	}
+
+	if configExists {
+		loaded, err := readFileConfig(cfgLocation)
+		if err != nil {
+			return nil, err
+		}
+		if loaded.Kubeconfig != "" {
+			raw.Kubeconfig = loaded.Kubeconfig
+		}
+		if loaded.Sources != "" {
+			raw.Sources = loaded.Sources
+		}
+	}
 
 	if kubeconfig != "" {
-		v.Set(keyKubeconfig, kubeconfig)
+		raw.Kubeconfig = kubeconfig
 	}
 	if sources != "" {
-		v.Set(keySources, sources)
+		raw.Sources = sources
 	}
 
-	if kubeconfig != "" || sources != "" {
-		if err := v.WriteConfigAs(cfgLocation); err != nil {
-			return nil, fmt.Errorf("write config: %w", err)
-		}
-	}
-
-	if err := v.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
-		if errors.As(err, &notFound) {
+	shouldWrite := !configExists || kubeconfig != "" || sources != ""
+	if shouldWrite {
+		if !configExists {
 			fmt.Fprintf(os.Stderr, "No kuse configuration found; creating defaults at %s\n", cfgLocation)
-			if err := v.WriteConfigAs(cfgLocation); err != nil {
-				return nil, fmt.Errorf("create config: %w", err)
-			}
-		} else {
-			return nil, fmt.Errorf("read config: %w", err)
+		}
+		if err := writeFileConfig(cfgLocation, raw); err != nil {
+			return nil, err
 		}
 	}
 
-	expandedKubeconfig, err := expandHome(v.GetString(keyKubeconfig))
+	expandedKubeconfig, err := expandHome(raw.Kubeconfig)
 	if err != nil {
 		return nil, fmt.Errorf("expand kubeconfig path: %w", err)
 	}
-	expandedSources, err := expandHome(v.GetString(keySources))
+	expandedSources, err := expandHome(raw.Sources)
 	if err != nil {
 		return nil, fmt.Errorf("expand sources path: %w", err)
 	}
@@ -84,4 +95,30 @@ func InitConfig(kubeconfig string, sources string) (*Config, error) {
 		Kubeconfig: expandedKubeconfig,
 		Sources:    expandedSources,
 	}, nil
+}
+
+func readFileConfig(path string) (fileConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fileConfig{}, fmt.Errorf("read config: %w", err)
+	}
+	var cfg fileConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return fileConfig{}, fmt.Errorf("parse config: %w", err)
+	}
+	return cfg, nil
+}
+
+func writeFileConfig(path string, cfg fileConfig) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create config directory: %w", err)
+	}
+	data, err := yaml.Marshal(&cfg)
+	if err != nil {
+		return fmt.Errorf("encode config: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("write config: %w", err)
+	}
+	return nil
 }

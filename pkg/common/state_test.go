@@ -52,7 +52,7 @@ func TestLoadStateAndSetTarget(t *testing.T) {
 		t.Fatalf("targets = %v, want [development production]", names)
 	}
 
-	if err := s.SetTarget("production"); err != nil {
+	if err := s.SetTarget("production", false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,7 +90,7 @@ func TestSetTargetInvalid(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetTarget("missing"); err == nil {
+	if err := s.SetTarget("missing", false); err == nil {
 		t.Fatal("expected error for invalid target")
 	}
 }
@@ -150,10 +150,64 @@ func TestSetTargetCreatesParentDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetTarget("dev"); err != nil {
+	if err := s.SetTarget("dev", false); err != nil {
 		t.Fatal(err)
 	}
 	if !isSymlink(kubeconfig) {
 		t.Fatal("expected kubeconfig symlink to be created")
+	}
+}
+
+func TestSetTargetForceOverwritesRegularFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	sources := filepath.Join(root, "kubeconfigs")
+	kubeconfig := filepath.Join(root, "config")
+	if err := os.MkdirAll(sources, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(sources, "dev.yaml")
+	if err := os.WriteFile(target, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(kubeconfig, []byte("regular file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := LoadState(&Config{Kubeconfig: kubeconfig, Sources: sources})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetTarget("dev", true); err != nil {
+		t.Fatal(err)
+	}
+	if !isSymlink(kubeconfig) {
+		t.Fatal("expected force overwrite to create symlink")
+	}
+}
+
+func TestLoadTargetsSkipsHiddenFiles(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	sources := filepath.Join(root, "kubeconfigs")
+	if err := os.MkdirAll(sources, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sources, "visible.yaml"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sources, ".hidden.yaml"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := LoadState(&Config{Kubeconfig: filepath.Join(root, "missing"), Sources: sources})
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := s.TargetNames()
+	if len(names) != 1 || names[0] != "visible" {
+		t.Fatalf("targets = %v, want [visible]", names)
 	}
 }

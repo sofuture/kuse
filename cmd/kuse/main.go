@@ -16,6 +16,7 @@ type args struct {
 	Kubeconfig string `arg:"--kubeconfig" help:"path to the active kubeconfig symlink"`
 	Sources    string `arg:"--sources" help:"directory containing kubeconfig files"`
 	Short      bool   `arg:"--short" help:"print only the current target name"`
+	Force      bool   `arg:"--force,-f" help:"overwrite a non-symlink kubeconfig without prompting"`
 	Version    bool   `arg:"--version" help:"print version and exit"`
 }
 
@@ -52,7 +53,7 @@ func main() {
 		return
 	}
 
-	if err := s.SetTarget(args.Name); err != nil {
+	if err := s.SetTarget(args.Name, args.Force); err != nil {
 		fatal(err)
 	}
 }

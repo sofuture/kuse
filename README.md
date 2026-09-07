@@ -27,7 +27,7 @@ make
 ### How do I use it
 
 ```
-Usage: kuse [--kubeconfig KUBECONFIG] [--sources SOURCES] [--short] [--version] [NAME]
+Usage: kuse [--kubeconfig KUBECONFIG] [--sources SOURCES] [--short] [--force] [--version] [NAME]
 
 Positional arguments:
   NAME                   kubeconfig target name to activate
@@ -37,6 +37,7 @@ Options:
                          path to the active kubeconfig symlink
   --sources SOURCES      directory containing kubeconfig files
   --short                print only the current target name
+  --force, -f            overwrite a non-symlink kubeconfig without prompting
   --version              print version and exit
   --help, -h             display this help and exit
 ```
@@ -45,9 +46,10 @@ Options:
 - config lives at `$XDG_CONFIG_HOME/kuse/kuseconfig.yaml` (typically `~/.config/kuse/kuseconfig.yaml`)
   - `kubeconfig` defaults to `~/.kube/config`
   - `sources` defaults to `~/kubeconfigs` (created automatically if missing)
-- use `--kubeconfig` or `--sources` to override and persist those values
+- use `--kubeconfig` or `--sources` to override and persist those values (partial overrides keep other saved settings)
 - run `kuse` to show the current kubeconfig in use
 - run `kuse <name>` to switch to a different target
+- run `kuse --force <name>` to replace a regular kubeconfig file without prompting
 - run `kuse --short` for prompt-friendly output (current name only, no newline)
 
 ### Example

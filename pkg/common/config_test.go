@@ -63,3 +63,30 @@ func TestInitConfigOverrides(t *testing.T) {
 		t.Fatalf("expected sources dir: %v", err)
 	}
 }
+
+func TestInitConfigPreservesUnsetFieldsOnPartialOverride(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	xdg.Reload()
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	customKube := filepath.Join(home, "my-kube")
+	customSources := filepath.Join(home, "my-sources")
+	if _, err := InitConfig(customKube, customSources); err != nil {
+		t.Fatal(err)
+	}
+
+	newSources := filepath.Join(home, "other-sources")
+	cfg, err := InitConfig("", newSources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Kubeconfig != customKube {
+		t.Fatalf("Kubeconfig = %q, want preserved %q", cfg.Kubeconfig, customKube)
+	}
+	if cfg.Sources != newSources {
+		t.Fatalf("Sources = %q, want %q", cfg.Sources, newSources)
+	}
+}

@@ -42,6 +42,9 @@ func (s *State) loadTargets() error {
 			continue
 		}
 		name := file.Name()
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
 		if !isYaml(name) {
 			continue
 		}
@@ -79,13 +82,15 @@ func (s *State) loadCurrent() error {
 	return nil
 }
 
-func (s *State) switchLink(target string) error {
+func (s *State) switchLink(target string, force bool) error {
 	if exists(s.config.Kubeconfig) {
 		if !isSymlink(s.config.Kubeconfig) {
-			fmt.Fprint(os.Stderr, "kubeconfig is not a symlink; overwrite anyway? [y/N]: ")
-			c, err := bufio.NewReader(os.Stdin).ReadString('\n')
-			if err != nil || strings.TrimSpace(strings.ToUpper(c)) != "Y" {
-				return fmt.Errorf("leaving kubeconfig alone")
+			if !force {
+				fmt.Fprint(os.Stderr, "kubeconfig is not a symlink; overwrite anyway? [y/N]: ")
+				c, err := bufio.NewReader(os.Stdin).ReadString('\n')
+				if err != nil || strings.TrimSpace(strings.ToUpper(c)) != "Y" {
+					return fmt.Errorf("leaving kubeconfig alone")
+				}
 			}
 		}
 		if err := os.Remove(s.config.Kubeconfig); err != nil {
@@ -121,10 +126,11 @@ func (s *State) PrintStatusCommand() {
 }
 
 // SetTarget switches the kubeconfig symlink to the named target.
-func (s *State) SetTarget(target string) error {
+// When force is true, a non-symlink kubeconfig is overwritten without prompting.
+func (s *State) SetTarget(target string, force bool) error {
 	for _, t := range s.targets {
 		if t.Name == target {
-			return s.switchLink(t.File)
+			return s.switchLink(t.File, force)
 		}
 	}
 	return fmt.Errorf("invalid target: %s", target)
